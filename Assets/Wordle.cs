@@ -5,26 +5,44 @@ public class Wordle : MonoBehaviour{
     public GameObject tile;
     public GameObject row;
     
-    public string word;
+    public string[] words;
     public int guesses;
 
-    private int expendedGuesses = 0;
+    [SerializeField] private int level = 0;
+    
+    private int usedGuesses = 0;
     private int selectedTile = 0; //which tile are we going to type on relative to the current row?
+    private bool won = false;
 
     [SerializeField] private List<List<Tile>> tiles = new List<List<Tile>>();
 
-    void StartGame(){
-        expendedGuesses = 0;
+    void StartGame(int newLevel = 0){
+        if (newLevel > words.Length - 1){
+            Debug.LogWarning("Wordle: Final level has been reached!");
+            return;
+        }
+        won = false;
+        level = newLevel;
+        usedGuesses = 0;
         selectedTile = 0;
+        Clear();
         for (int i = 0; i < guesses; ++i){
             Transform newRow = Instantiate(row, gameObject.transform).transform;
             List<Tile> newTiles = new List<Tile>();
-            for (int j = 0; j < word.Length; ++j){
+            for (int j = 0; j < words[level].Length; ++j){
                 Tile newTile = Instantiate(tile, newRow).GetComponent<Tile>();
                 newTiles.Add(newTile);
             }
             tiles.Add(newTiles);
         }
+    }
+
+    void Clear(){
+        //clears all rows & tiles
+        for (int i = 0; i < tiles.Count; ++i){
+            Destroy(tiles[i][0].transform.parent.gameObject);
+        }
+        tiles.RemoveRange(0, tiles.Count);
     }
 
     private char GetInputChar(){
@@ -90,28 +108,64 @@ public class Wordle : MonoBehaviour{
     }
 
     private void Start(){
-        StartGame();
+        StartGame(0);
     }
 
     private void Update(){
-        if (tiles.Count < 0)
+        if (tiles.Count == 0)
             return;
         string input = GetInputChar().ToString();
-        Tile currentTile = tiles[expendedGuesses][selectedTile];
+        Tile currentTile = null;
+        if (!won){
+            currentTile = tiles[usedGuesses][selectedTile];
+            currentTile.selected = true;
+        }
         if (input != "\0"){
             if (currentTile.letter == string.Empty)
                 currentTile.letter = input;
-            if (selectedTile < word.Length - 1)
+            if (selectedTile < words[level].Length - 1){
+                currentTile.selected = false;
                 selectedTile++;
+            }
         }
         else if (Input.GetKeyDown(KeyCode.Backspace)){
-            currentTile.letter = string.Empty;
-            if (selectedTile > 0)
-                selectedTile--;
+            if (selectedTile > 0){
+                if (selectedTile == words[level].Length - 1){
+                    if (currentTile.letter == string.Empty){
+                        tiles[usedGuesses][selectedTile - 1].letter = string.Empty;
+                        currentTile.selected = false;
+                        selectedTile--;
+                    }
+                    else{
+                        currentTile.letter = string.Empty;
+                    }
+                }
+                else{
+                    tiles[usedGuesses][selectedTile - 1].letter = string.Empty;
+                    currentTile.selected = false;
+                    selectedTile--;
+                }
+            }
         }
-        else if (Input.GetKeyDown(KeyCode.Return)){
-            for (int i = 0; i < tiles[expendedGuesses].Count; ++i){
-                tiles[expendedGuesses][i].Check(word, i);
+        else if (Input.GetKeyDown(KeyCode.Return) && selectedTile == words[level].Length - 1){
+            if (won){
+                StartGame(level + 1);
+            }
+            else{
+                int correct = 0;
+                for (int i = 0; i < tiles[usedGuesses].Count; ++i){
+                    int returnCode = tiles[usedGuesses][i].Check(words[level], i);
+                    correct += returnCode;
+                }
+                if (correct == words[level].Length){
+                    won = true;
+                    currentTile.selected = false;
+                }
+                else if (usedGuesses < tiles.Count - 1){
+                    usedGuesses++;
+                    currentTile.selected = false;
+                    selectedTile = 0;
+                }
             }
         }
     }

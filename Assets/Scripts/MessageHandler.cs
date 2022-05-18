@@ -2,9 +2,13 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
+
+/* coroutines in this script are managed by nullchecking.
+ * use StopAndSetToNull in order to correctly stop a coroutine.
+*/
 
 public class MessageHandler : MonoBehaviour{
+    [SerializeField] private int startDelay = 2;
     [SerializeField] private string[] slides;
     [SerializeField] private List<string> slideTimes;
 
@@ -18,18 +22,20 @@ public class MessageHandler : MonoBehaviour{
     private float shortDuration = .25f;
     private float longDuration = .05f;
     private Coroutine slideshow;
+    private Coroutine pause;
 
     IEnumerator Slideshow(){        
         while (enabled){
             if (currentSlide == slides.Length - 1){
-                yield break; //auto cancel coroutine if slide index exceeds slide elements
+                SetHidden(true);
+                StopAndSetToNull(ref slideshow);
             }
             
             currentSlide++;
             
             if (slides[currentSlide] == "MOVE"){
                 CameraController.instance.SetCurrentPos(CameraController.instance.onRoom);
-                continue;
+                PauseSlides();
             }
             
             else{
@@ -42,22 +48,69 @@ public class MessageHandler : MonoBehaviour{
         }
     }
 
+    private void PauseSlides(float duration = 5f){
+        if (slideshow == null || pause != null){
+            return;
+        }
+
+        IEnumerator Pause(){
+            yield return new WaitForSeconds(duration);
+            SetHidden(false);
+            slideshow = StartCoroutine(Slideshow());
+            StopAndSetToNull(ref pause);
+        }
+
+        SetHidden(true);
+        StopAndSetToNull(ref slideshow);
+        pause = StartCoroutine(Pause());
+    }
+
     private void SkipSlide(){
-        if (slideshow == null){
+        if (slideshow == null || pause != null){ //disallow when paused as this dupes coroutine
             return;
         }
         
-        StopCoroutine(slideshow);
+        StopAndSetToNull(ref slideshow);
         slideshow = StartCoroutine(Slideshow()); //skips slide by restarting coroutine if valid
     }
 
-    private void Start(){        
-        slideshow = StartCoroutine(Slideshow());
+    private void SetHidden(bool hidden = true, bool instant = false){
+        //set all graphics in children's opacity
+        Graphic[] graphics = GetComponentsInChildren<Graphic>();
+        int newOpacity = hidden ? 0 : 1;
+        float duration = instant ? 0 : 0.75f;
+        foreach (Graphic graphic in graphics){
+            graphic.CrossFadeAlpha(newOpacity, duration, true);
+        }
     }
 
-    private void Update(){
-        slideTimer += Time.deltaTime;
-        progressBar.fillAmount = slideTimer / nextSlideTimer;
+    private void StopAndSetToNull(ref Coroutine coroutine){
+        StopCoroutine(coroutine);
+        coroutine = null;
+    }
+
+    private void Start(){        
+        SetHidden(true, instant: true);
+        
+        //begin slideshow after short delay
+        IEnumerator BeginSlideshow(){
+            yield return new WaitForSeconds(startDelay);
+            SetHidden(false);
+            slideshow = StartCoroutine(Slideshow());
+        }
+        
+        StartCoroutine(BeginSlideshow());
+    }
+
+    private void Update(){        
+        if (slideshow != null){
+            slideTimer += Time.deltaTime;
+            progressBar.fillAmount = slideTimer / nextSlideTimer;
+        }
+
+        else{
+            progressBar.fillAmount = 0;
+        }
 
         //debug
         if (Input.GetKeyDown(KeyCode.Space)){

@@ -2,15 +2,27 @@ using UnityEngine;
 
 public class CameraController : MonoBehaviour
 {
-    public Transform title;
+    public static CameraController instance;
+
+    private void Awake() {
+        if (instance == null){
+            instance = this;
+        }
+        else{
+            Destroy(gameObject);
+        }
+    }
+    
+    public Transform onRoom;
     public Transform onBox;
+    public Transform onSky;
     public float smoothTime;
     
     private Vector3 currentPos;
     private Vector3 currentRot;
 
     void Start(){
-        SetCurrentPos(title);
+        SetCurrentPos(onSky, instantly: true);
     }
 
     void Update(){
@@ -18,7 +30,7 @@ public class CameraController : MonoBehaviour
         gameObject.transform.rotation = Quaternion.Lerp(gameObject.transform.rotation, Quaternion.Euler(currentRot), smoothTime * Time.deltaTime);
 
         if (Input.GetKeyDown(KeyCode.Alpha1)){
-            SetCurrentPos(title);
+            SetCurrentPos(onRoom);
         }
     
         else if (Input.GetKeyDown(KeyCode.Alpha2)){
@@ -26,8 +38,13 @@ public class CameraController : MonoBehaviour
         }
     }
 
-    void SetCurrentPos(Transform newPos){        
+    public void SetCurrentPos(Transform newPos, bool instantly = false){        
         currentPos = newPos.position;
         currentRot = newPos.rotation.eulerAngles;
+
+        if (instantly){
+            gameObject.transform.position = newPos.position;
+            gameObject.transform.rotation = newPos.rotation;
+        }
     }
 }

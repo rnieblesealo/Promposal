@@ -26,15 +26,16 @@ public class MessageHandler : MonoBehaviour{
 
     IEnumerator Slideshow(){        
         while (enabled){
-            if (currentSlide == slides.Length - 1){
+            if (currentSlide >= slides.Length - 1){
                 SetHidden(true);
                 StopAndSetToNull(ref slideshow);
+                yield break;
             }
             
             currentSlide++;
             
             if (slides[currentSlide] == "MOVE"){
-                CameraController.instance.SetCurrentPos(CameraController.instance.onRoom);
+                CameraController.instance.SetCurrentPos(CameraController.CameraLocation.OnRoom);
                 PauseSlides();
             }
             
@@ -66,7 +67,7 @@ public class MessageHandler : MonoBehaviour{
     }
 
     private void SkipSlide(){
-        if (slideshow == null || pause != null){ //disallow when paused as this dupes coroutine
+        if (slideshow == null || pause != null || currentSlide >= slides.Length - 1){ //disallow when paused as this dupes coroutine
             return;
         }
         
@@ -85,6 +86,10 @@ public class MessageHandler : MonoBehaviour{
     }
 
     private void StopAndSetToNull(ref Coroutine coroutine){
+        if (coroutine == null){
+            return;
+        }
+        
         StopCoroutine(coroutine);
         coroutine = null;
     }

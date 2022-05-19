@@ -1,11 +1,25 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class Wordle : MonoBehaviour{
+    #region Singleton
+    public static Wordle instance;
+    private void Awake() {
+        if (instance == null){
+            instance = this;
+        }
+        else{
+            Destroy(gameObject);
+        }
+    }
+    #endregion
+
     public GameObject tile;
     public GameObject row;
     
     public string[] words;
+    public string[] hints;
     public int guesses;
 
     [SerializeField] private int level = 0;
@@ -13,35 +27,51 @@ public class Wordle : MonoBehaviour{
     private int usedGuesses = 0;
     private int selectedTile = 0; //which tile are we going to type on relative to the current row?
     private bool won = false;
+    private List<List<Tile>> tiles = new List<List<Tile>>();
+    [SerializeField] private Text levelText;
+    [SerializeField] private Text hintText;
 
-    [SerializeField] private List<List<Tile>> tiles = new List<List<Tile>>();
-
-    void StartGame(int newLevel = 0){
+    public void StartGame(int newLevel = 0){
         if (newLevel > words.Length - 1){
+            //move to box
+            EndGame();
             Debug.LogWarning("Wordle: Final level has been reached!");
             return;
         }
+        
         won = false;
         level = newLevel;
         usedGuesses = 0;
         selectedTile = 0;
+        
         Clear();
+        //bro this is some o(n^3) shit but at this point...
         for (int i = 0; i < guesses; ++i){
             Transform newRow = Instantiate(row, gameObject.transform).transform;
             List<Tile> newTiles = new List<Tile>();
             for (int j = 0; j < words[level].Length; ++j){
                 Tile newTile = Instantiate(tile, newRow).GetComponent<Tile>();
                 newTiles.Add(newTile);
+
+                //make tile transparent at start
+                foreach (Graphic graphic in newTile.GetComponentsInChildren<Graphic>()){
+                    graphic.CrossFadeAlpha(0, 0, true);
+                }
             }
             tiles.Add(newTiles);
         }
+        
+        SetHidden(false);
+        levelText.text = "Level " + (level + 1).ToString() + "/" + (words.Length).ToString();
+        hintText.text = "Hint: " + hints[level];
     }
 
-    void Clear(){
+    public void Clear(){
         //clears all rows & tiles
         for (int i = 0; i < tiles.Count; ++i){
             Destroy(tiles[i][0].transform.parent.gameObject);
         }
+        
         tiles.RemoveRange(0, tiles.Count);
     }
 
@@ -107,11 +137,25 @@ public class Wordle : MonoBehaviour{
         }
     }
 
-    private void Start(){
-        StartGame(0);
+    private void EndGame(){
+        //reset game
+        Clear();
+        
+        won = false;
+        level = 0;
+        usedGuesses = 0;
+        selectedTile = 0;
+        
+        //hide panel
+        SetHidden(true);
+
+        //move camera to box, open box, begin slideshow
+        CameraController.instance.SetCurrentPos(CameraController.CameraLocation.OnScreen);
+        BoxController.instance.slideshow = BoxController.instance.StartCoroutine(BoxController.instance.Slideshow());
+        BoxController.instance.opened = true;
     }
 
-    private void Update(){
+    private void UpdateGame(){
         if (tiles.Count == 0)
             return;
         string input = GetInputChar().ToString();
@@ -160,6 +204,7 @@ public class Wordle : MonoBehaviour{
                 if (correct == words[level].Length){
                     won = true;
                     currentTile.selected = false;
+                    hintText.text = "<b><color=#ffa500ff>Press ENTER to move on!</color></b>";
                 }
                 else if (usedGuesses < tiles.Count - 1){
                     usedGuesses++;
@@ -168,5 +213,20 @@ public class Wordle : MonoBehaviour{
                 }
             }
         }
+    }
+
+    private void SetHidden(bool hidden = true){
+        int newOpacity = hidden ? 0 : 1;
+        foreach (Graphic graphic in GetComponentsInChildren<Graphic>()){
+            graphic.CrossFadeAlpha(newOpacity, 0.75f, true);
+        }
+    }
+
+    private void Start(){
+        SetHidden(true);
+    }
+
+    private void Update(){
+        UpdateGame();
     }
 }
